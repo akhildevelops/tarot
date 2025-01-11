@@ -2,12 +2,18 @@ const std = @import("std");
 const NOTFOUND = "Not Found";
 const PAYLOAD_TOO_LARGE = "Payload Too Large";
 const BAD_REQUEST = "Bad Request";
+const FORBIDDEN = "Forbidden";
 const TEXT = "text/html; charset=utf8";
+const HELP_MESSAGE =
+    \\Try in this format http://&lthost_name&gt/date/&ltyear&gt/&ltmonth&gt/&ltday&gt to find your tarrot card.
+    \\Example: http://&lthost_name&gt/date/1999/10/11
+;
 const defaulttemplate =
     \\HTTP/1.1 {d} {s}
     \\Connection: close
     \\Content-Type: {s}
     \\Content-Length: {d}
+    \\
     \\{s}
 ;
 const img_template =
@@ -21,7 +27,7 @@ const img_template =
 const http404 = std.fmt.comptimePrint(defaulttemplate, .{ 404, NOTFOUND, TEXT, NOTFOUND.len, NOTFOUND });
 const http413 = std.fmt.comptimePrint(defaulttemplate, .{ 413, PAYLOAD_TOO_LARGE, TEXT, PAYLOAD_TOO_LARGE.len, PAYLOAD_TOO_LARGE });
 const http400 = std.fmt.comptimePrint(defaulttemplate, .{ 400, BAD_REQUEST, TEXT, BAD_REQUEST.len, BAD_REQUEST });
-
+const helpMessage = std.fmt.comptimePrint(defaulttemplate, .{ 403, FORBIDDEN, TEXT, HELP_MESSAGE.len, HELP_MESSAGE });
 fn parse_path(request_line: []const u8) ![]const u8 {
     var line_iterator = std.mem.tokenizeScalar(u8, request_line, ' ');
     const request_type = line_iterator.next() orelse return error.HeaderMalformed;
@@ -40,7 +46,6 @@ fn parse_date(date_line: []const u8) !Date {
     const day = try std.fmt.parseInt(u16, date_iterator.next() orelse return error.DayNotPresent, 10);
     return Date{ .day = day, .month = month, .year = year };
 }
-
 pub fn openLocalFile(path: []const u8) ![]u8 {
     const localPath = path;
     const file = std.fs.cwd().openFile(localPath, .{}) catch |err| switch (err) {
@@ -51,14 +56,12 @@ pub fn openLocalFile(path: []const u8) ![]u8 {
         else => return err,
     };
     defer file.close();
-    std.debug.print("file: {}\n", .{file});
     const memory = std.heap.page_allocator;
     const maxSize = std.math.maxInt(usize);
     return try file.readToEndAlloc(memory, maxSize);
 }
-
 pub fn main() !void {
-    const address = try std.net.Address.resolveIp("::", 8086);
+    const address = try std.net.Address.resolveIp("0.0.0.0", 8086);
     var server = try address.listen(.{ .reuse_address = true });
     std.debug.print("{}\n", .{address});
     while (server.accept()) |connection| {
@@ -68,51 +71,43 @@ pub fn main() !void {
             std.debug.print("{s}\n", .{@errorName(err)});
             continue;
         };
-        // If the request data is more than 4KB, return can't handle.
         if (bytes_read >= 4 * 1024) {
             try connection.stream.writeAll(http413);
             continue;
         }
         const content = buffer[0..bytes_read];
-        std.debug.print("{s}\n", .{content});
         var request_iterator = std.mem.tokenizeSequence(u8, content, "\r\n");
-        // Parse content
         const path = parse_path(request_iterator.next() orelse {
             try connection.stream.writeAll(http400);
             continue;
         }) catch |err| {
-            std.debug.print("{s}", .{@errorName(err)});
+            std.debug.print("{s}\n", .{@errorName(err)});
             continue;
         };
 
         if (std.mem.startsWith(u8, path, "/date")) {
             const date = parse_date(path) catch |err| {
-                std.debug.print("{s}", .{@errorName(err)});
+                std.debug.print("{s}\n", .{@errorName(err)});
                 continue;
             };
             const total: u16 = (date.day + date.month + date.year) % 12;
             const file_path = std.fmt.allocPrint(std.heap.page_allocator, "resources/tarots/{}.png", .{total}) catch |err| {
-                std.debug.print("{s}", .{@errorName(err)});
+                std.debug.print("{s}\n", .{@errorName(err)});
                 continue;
             };
             defer std.heap.page_allocator.free(file_path);
             const buf = openLocalFile(file_path) catch |err| {
-                std.debug.print("{s}", .{@errorName(err)});
+                std.debug.print("{s}\n", .{@errorName(err)});
                 continue;
             };
             defer std.heap.page_allocator.free(buf);
             _ = try connection.stream.writer().print(img_template, .{buf.len});
             _ = try connection.stream.writeAll(buf);
+        } else {
+            _ = try connection.stream.writeAll(helpMessage);
         }
         try connection.stream.writeAll(http404);
     } else |err| {
         return err;
     }
-}
-
-test "simple test" {
-    var list = std.ArrayList(i32).init(std.testing.allocator);
-    defer list.deinit(); // try commenting this out and see if zig detects the memory leak!
-    try list.append(42);
-    try std.testing.expectEqual(@as(i32, 42), list.pop());
 }
