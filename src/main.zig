@@ -58,7 +58,7 @@ pub fn openLocalFile(path: []const u8) ![]u8 {
 }
 
 pub fn main() !void {
-    const address = try std.net.Address.parseIp("127.0.0.1", 8086);
+    const address = try std.net.Address.resolveIp("::", 8086);
     var server = try address.listen(.{ .reuse_address = true });
     std.debug.print("{}\n", .{address});
     while (server.accept()) |connection| {
