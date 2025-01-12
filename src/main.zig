@@ -1,4 +1,5 @@
 const std = @import("std");
+const config = @import("config");
 const NOTFOUND = "Not Found";
 const PAYLOAD_TOO_LARGE = "Payload Too Large";
 const BAD_REQUEST = "Bad Request";
@@ -61,7 +62,12 @@ pub fn openLocalFile(path: []const u8) ![]u8 {
     return try file.readToEndAlloc(memory, maxSize);
 }
 pub fn main() !void {
-    const address = try std.net.Address.resolveIp("0.0.0.0", 8086);
+    const address = if (config.is_ipv6) blk:{
+        break: blk try std.net.Address.resolveIp("::1", 8086);
+    } else blk:{
+        break: blk try std.net.Address.resolveIp("127.0.0.1", 8086);
+    };
+    
     var server = try address.listen(.{ .reuse_address = true });
     std.debug.print("{}\n", .{address});
     while (server.accept()) |connection| {

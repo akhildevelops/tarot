@@ -1,0 +1,31 @@
+name: tarot
+on:
+  push:
+    branches:
+      - master
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: mlugg/setup-zig@v1
+        with:
+          version: 0.14.0-dev.2634+b36ea592b
+      - name: Build the binary
+        run: |
+          zig build -Dtarget=x86_64-linux-gnu -Dipv6 -Doptimize=ReleaseFast
+      - name: Make a release package
+        run: |
+          mkdir tarot &&\
+          cp -r resources/ tarot/ &&\
+          cp zig-out/bin/tarot tarot/ &&\
+          GZIP=9 tar -cvf tarot.tar.gz tarot/
+          
+      - name: Deploy to target server
+        run: |
+          curl -X POST ${{ secrets.hostname }} -F 'files=@tarot.tar.gz' -u ${{ secrets.user_password }}
+
+
+
+
+

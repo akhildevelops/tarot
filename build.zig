@@ -9,32 +9,27 @@ pub fn build(b: *std.Build) void {
     // means any target is allowed, and the default is native. Other options
     // for restricting supported target set are available.
     const target = b.standardTargetOptions(.{});
-
+    const is_ipv6 = b.option(bool, "ipv6", "deploy on ipv6") orelse false;
     // Standard optimization options allow the person running `zig build` to select
     // between Debug, ReleaseSafe, ReleaseFast, and ReleaseSmall. Here we do not
     // set a preferred release mode, allowing the user to decide how to optimize.
     const optimize = b.standardOptimizeOption(.{});
 
-    const lib = b.addStaticLibrary(.{
-        .name = "tarot",
-        // In this case the main source file is merely a path, however, in more
-        // complicated build scripts, this could be a generated file.
-        .root_source_file = b.path("src/root.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
+    // https://ziglang.org/learn/build-system/
+    const options = b.addOptions();
+    options.addOption(bool, "is_ipv6", is_ipv6);
+    
 
-    // This declares intent for the library to be installed into the standard
-    // location when the user invokes the "install" step (the default step when
-    // running `zig build`).
-    b.installArtifact(lib);
 
     const exe = b.addExecutable(.{
         .name = "tarot",
         .root_source_file = b.path("src/main.zig"),
         .target = target,
         .optimize = optimize,
+        .link_libc = true
     });
+
+    exe.root_module.addOptions("config", options);
 
     // This declares intent for the executable to be installed into the
     // standard location when the user invokes the "install" step (the default
