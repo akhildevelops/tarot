@@ -5,7 +5,7 @@ const BAD_REQUEST = "Bad Request";
 const FORBIDDEN = "Forbidden";
 const TEXT = "text/html; charset=utf8";
 const HELP_MESSAGE =
-    \\Try in this format http://&lthost_name&gt/date/&ltyear&gt/&ltmonth&gt/&ltday&gt to find your tarrot card.
+    \\Try in this format http://&lthost_name&gt/date/&ltyear&gt/&ltmonth&gt/&ltday&gt to find your tarot card.
     \\Example: http://&lthost_name&gt/date/1999/10/11
 ;
 const defaulttemplate =
