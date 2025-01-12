@@ -6,6 +6,7 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    environment: remote
     steps:
       - uses: actions/checkout@v4
       - uses: mlugg/setup-zig@v1
